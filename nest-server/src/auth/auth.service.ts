@@ -55,33 +55,42 @@ export class AuthService {
     }
     return this.saveSession(req, user)
   }
-  async logout(req: Request, res: Response): Promise<void> {
+
+  public async logout(req: Request, res: Response): Promise<void> {
     return new Promise((resolve, reject) => {
       req.session.destroy(err => {
         if (err) {
+
           return reject(
             new InternalServerErrorException(
-              'Не удалось завершить сессию. Возможно, возникла проблема с сервером или сессия уже была завершена.'
+              'Не удалось завершить сессию. ' +
+              'Возможно, возникла проблема с сервером или сессия уже была завершена.'
             )
           )
         }
-        res.clearCookie(this.configService.getOrThrow<string>('SESSION_NAME'))
+
+        res.clearCookie(
+          this.configService.getOrThrow<string>('SESSION_NAME')
+        )
         resolve()
       })
     })
   }
 
-  private async saveSession(req: Request, user: User) {
+  public async saveSession(req: Request & { userId?: string }, user: User) {
     return new Promise((resolve, reject) => {
       req.session.userId = user.id
-      req.session.save(error => {
-        if (error) {
+
+      req.session.save(err => {
+        if (err) {
           return reject(
             new InternalServerErrorException(
-              'Не удалось сохранить сессию. Проверьте правильно ли настроены параметры сессии'
+              'Не удалось сохранить сессию. ' +
+              'Проверьте, правильно ли настроены параметры сессии.'
             )
           )
         }
+        console.log('Session saved successfully:', req.session.userId)
         resolve({
           user
         })

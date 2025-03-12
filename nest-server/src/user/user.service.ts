@@ -9,15 +9,19 @@ export class UserService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async findById(id: string) {
+
     const user = await this.prismaService.user.findUnique({
       where: { id },
       include: {
         accounts: true
       }
     })
+
     if (!user) throw new NotFoundException('User does not exist')
+
     return user
   }
+
   async findByEmail(email: string) {
     const user = await this.prismaService.user.findUnique({
       where: { email },
@@ -27,6 +31,7 @@ export class UserService {
     })
     return user
   }
+
   async create(
     email: string,
     password: string,

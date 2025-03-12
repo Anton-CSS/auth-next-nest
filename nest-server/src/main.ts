@@ -14,15 +14,18 @@ import { AppModule } from './app.module'
 const start = async () => {
   const app = await NestFactory.create(AppModule)
   const config = app.get(ConfigService)
-  const redisUrl = `redis://${config.getOrThrow<string>('REDIS_USER')}:${config.getOrThrow<string>('REDIS_PASSWORD')}@${config.getOrThrow<string>('REDIS_HOST')}:${config.getOrThrow<string>('REDIS_PORT')}`
-  console.log(redisUrl)
+
+  const redisUrl = `redis://:${config.getOrThrow<string>('REDIS_PASSWORD')}@${config.getOrThrow<string>('REDIS_HOST')}:${config.getOrThrow<string>('REDIS_PORT')}`
   const redis = new IORedis(redisUrl)
+  console.log(redisUrl)
   app.use(cookieParser(config.getOrThrow<string>('COOKIES_SECRET')))
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true
     })
   )
+
   app.use(
     session({
       secret: config.getOrThrow<string>('SESSION_SECRET'),
@@ -32,9 +35,13 @@ const start = async () => {
       cookie: {
         domain: config.getOrThrow<string>('SESSION_DOMAIN'),
         maxAge: ms(config.getOrThrow<StringValue>('SESSION_MAX_AGE')),
-        httpOnly: parseBoolean(config.getOrThrow<string>('SESSION_HTTP_ONLY')),
-        secure: parseBoolean(config.getOrThrow<string>('SESSION_SECURE')),
-        sameSite: 'lax'
+        httpOnly: parseBoolean(
+          config.getOrThrow<string>('SESSION_HTTP_ONLY')
+        ),
+        secure: parseBoolean(
+          config.getOrThrow<string>('SESSION_SECURE')
+        ),
+        sameSite: 'none'
       },
       store: new RedisStore({
         client: redis,
@@ -42,11 +49,13 @@ const start = async () => {
       })
     })
   )
+
   app.enableCors({
-    origin: config.getOrThrow<string>('ALLOWED_ORIGIN'),
+    origin: '*',
     credentials: true,
-    exposeHeaders: ['set-cookie']
+    exposedHeaders: ['set-cookie']
   })
+
   await app.listen(config.getOrThrow<number>('PORT'), () =>
     console.log(`Server started on port ${config.getOrThrow<number>('PORT')}`)
   )
