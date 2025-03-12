@@ -1,3 +1,4 @@
+import { RedisStore } from 'connect-redis'
 import * as cookieParser from 'cookie-parser'
 import * as session from 'express-session'
 import IORedis from 'ioredis'
@@ -9,12 +10,13 @@ import { ConfigService } from '@nestjs/config'
 import { NestFactory } from '@nestjs/core'
 
 import { AppModule } from './app.module'
-import { RedisStore } from 'connect-redis'
 
 const start = async () => {
   const app = await NestFactory.create(AppModule)
   const config = app.get(ConfigService)
-  const redis = new IORedis(config.getOrThrow<string>('REDIS_URL'))
+  const redisUrl = `redis://${config.getOrThrow<string>('REDIS_USER')}:${config.getOrThrow<string>('REDIS_PASSWORD')}@${config.getOrThrow<string>('REDIS_HOST')}:${config.getOrThrow<string>('REDIS_PORT')}`
+  console.log(redisUrl)
+  const redis = new IORedis(redisUrl)
   app.use(cookieParser(config.getOrThrow<string>('COOKIES_SECRET')))
   app.useGlobalPipes(
     new ValidationPipe({
@@ -45,7 +47,9 @@ const start = async () => {
     credentials: true,
     exposeHeaders: ['set-cookie']
   })
-  await app.listen(config.getOrThrow<number>('PORT'))
+  await app.listen(config.getOrThrow<number>('PORT'), () =>
+    console.log(`Server started on port ${config.getOrThrow<number>('PORT')}`)
+  )
 }
 
 start()
