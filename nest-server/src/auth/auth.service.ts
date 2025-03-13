@@ -2,6 +2,8 @@ import { verify } from 'argon2'
 import { Request, Response } from 'express'
 
 import { LoginDto, RegisterDto } from '@/auth/dto/auth.dto'
+import { PrismaService } from '@/prisma/prisma.service'
+import { ProviderService } from '@/provider/provider.service'
 import { UserService } from '@/user/user.service'
 import {
   ConflictException,
@@ -17,7 +19,9 @@ import { AuthMethod, User } from '@prisma/__generated__'
 export class AuthService {
   constructor(
     private readonly userService: UserService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly providerService: ProviderService,
+    private readonly prismaService: PrismaService
   ) {}
   async register(req: Request, dto: RegisterDto) {
     const isExist = await this.userService.findByEmail(dto.email)
@@ -39,6 +43,41 @@ export class AuthService {
 
     return this.saveSession(req, newUser)
   }
+
+  async extractProfileFromCode(req: Request, provider: string, code: string) {
+    const providerInstance = this.providerService.findByService(provider)
+    const profile = await providerInstance?.findUserByCode(code)
+    const account = await this.prismaService.account.findFirst({
+      where: { id: profile?.id, provider: profile?.provider }
+    })
+    let user = account?.userId
+      ? await this.userService.findById(account.userId)
+      : null
+    if (user) return this.saveSession(req, user)
+    user = await this.userService.create(
+      profile?.email ?? '',
+      '',
+      profile?.name ?? '',
+      profile?.picture ?? '',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      AuthMethod[profile?.provider?.toUpperCase() ?? 'YANDEX'],
+      true
+    )
+    if (!account) {
+      await this.prismaService.account.create({
+        data: {
+          userId: user.id,
+          type: 'oauth',
+          provider: profile?.provider ?? '',
+          accessToken: profile?.access_token,
+          refreshToken: profile?.refresh_token,
+          expiredAt: profile?.expires_at ?? 0
+        }
+      })
+    }
+    return this.saveSession(req, user)
+  }
+
   async login(req: Request, dto: LoginDto) {
     const user = await this.userService.findByEmail(dto.email)
     if (!user || !user.password) {
@@ -60,18 +99,15 @@ export class AuthService {
     return new Promise((resolve, reject) => {
       req.session.destroy(err => {
         if (err) {
-
           return reject(
             new InternalServerErrorException(
               'Не удалось завершить сессию. ' +
-              'Возможно, возникла проблема с сервером или сессия уже была завершена.'
+                'Возможно, возникла проблема с сервером или сессия уже была завершена.'
             )
           )
         }
 
-        res.clearCookie(
-          this.configService.getOrThrow<string>('SESSION_NAME')
-        )
+        res.clearCookie(this.configService.getOrThrow<string>('SESSION_NAME'))
         resolve()
       })
     })
@@ -86,7 +122,7 @@ export class AuthService {
           return reject(
             new InternalServerErrorException(
               'Не удалось сохранить сессию. ' +
-              'Проверьте, правильно ли настроены параметры сессии.'
+                'Проверьте, правильно ли настроены параметры сессии.'
             )
           )
         }
