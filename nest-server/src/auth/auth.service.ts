@@ -2,6 +2,7 @@ import { verify } from 'argon2'
 import { Request, Response } from 'express'
 
 import { LoginDto, RegisterDto } from '@/auth/dto/auth.dto'
+import { EmailConfirmationService } from '@/auth/email-confirmation/email-confirmation.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { ProviderService } from '@/provider/provider.service'
 import { UserService } from '@/user/user.service'
@@ -21,6 +22,7 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly configService: ConfigService,
     private readonly providerService: ProviderService,
+    private readonly emailConfirmationService: EmailConfirmationService,
     private readonly prismaService: PrismaService
   ) {}
   async register(req: Request, dto: RegisterDto) {
@@ -40,8 +42,13 @@ export class AuthService {
       AuthMethod.CREDENTIALS,
       false
     )
+    await this.emailConfirmationService.sendVerificationToken(newUser)
 
-    return this.saveSession(req, newUser)
+    return {
+      message:
+        'Вы успешно зарегистрировались. Пожалуйста, подтвердите ваш email. ' +
+        'Сообщение было отправлено на ваш почтовый адрес'
+    }
   }
 
   async extractProfileFromCode(req: Request, provider: string, code: string) {
@@ -92,6 +99,13 @@ export class AuthService {
         'Неверный пароль. Пожалуйста, попробуйте ещё раз или восстановите пароль, если забыли его'
       )
     }
+
+    if (!user.isVerified) {
+      await this.emailConfirmationService.sendVerificationToken(user)
+      throw new UnauthorizedException(
+        'Ваш email не подтвержден. Пожалуйста, проверьте вашу почту и подтвердите адрес'
+      )
+    }
     return this.saveSession(req, user)
   }
 
@@ -126,7 +140,6 @@ export class AuthService {
             )
           )
         }
-        console.log('Session saved successfully:', req.session.userId)
         resolve({
           user
         })

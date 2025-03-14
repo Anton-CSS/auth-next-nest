@@ -3,9 +3,7 @@ import { GoogleProvider } from '@/provider/services/google.provider'
 import { YandexProvider } from '@/provider/services/yandex.provider'
 import { ConfigService } from '@nestjs/config'
 
-export const getProviderConfig = async (
-  config: ConfigService
-): Promise<TypeOptions> => ({
+export const getProviderConfig = (config: ConfigService): TypeOptions => ({
   baseUrl: config.getOrThrow<string>('APP_URL'),
   services: [
     new GoogleProvider({
