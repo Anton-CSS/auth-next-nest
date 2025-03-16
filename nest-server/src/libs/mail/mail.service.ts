@@ -1,4 +1,5 @@
 import { ConfirmationTemplate } from '@/libs/mail/templates/confirmation.template'
+import { ResetTemplate } from '@/libs/mail/templates/reset.template'
 import { MailerService } from '@nestjs-modules/mailer'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
@@ -15,6 +16,12 @@ export class MailService {
     const domain = this.config.getOrThrow<string>('ALLOWED_ORIGIN')
     const html = await render(ConfirmationTemplate({ domain, token }))
     await this.sendEmail(email, 'Подтверждение почты', html)
+  }
+
+  async sendPasswordResetEmail(email: string, token: string) {
+    const domain = this.config.getOrThrow<string>('ALLOWED_ORIGIN')
+    const html = await render(ResetTemplate({ domain, token }))
+    await this.sendEmail(email, 'Сброс пароля', html)
   }
 
   private async sendEmail(
